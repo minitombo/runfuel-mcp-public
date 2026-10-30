@@ -202,20 +202,39 @@ mcp.add_tool(_privacy_filtered_tool(mfp_get_goals), name="mfp_get_goals", annota
 mcp.add_tool(_privacy_filtered_tool(mfp_get_measurements), name="mfp_get_measurements", annotations=READ_ONLY)
 
 
+_last_mfp_cookie: str | None = None
+
+
 async def apply_managed_credentials() -> None:
-    """Load encrypted credentials per request; never persist them to local disk."""
-    for name in token_manager.SECRET_NAMES:
+    """Load encrypted credentials concurrently; never persist them to local disk."""
+    global _last_mfp_cookie
+    names = tuple(token_manager.SECRET_NAMES)
+
+    async def load(name: str) -> tuple[str, str | None]:
         try:
             value = await token_manager.get_credential(name)
         except Exception:
             # Preserve env-based operation if managed storage is unavailable.
             value = os.environ.get(name)
+        return name, value
+
+    # Redis reads are independent. Running them together reduces the time this
+    # serverless invocation waits on credential storage.
+    loaded = await asyncio.gather(*(load(name) for name in names))
+    credentials = dict(loaded)
+    for name, value in credentials.items():
         if value:
             os.environ[name] = value
         else:
             os.environ.pop(name, None)
-    # The upstream client caches credentials; force it to reload the new cookie.
-    mfp_client.reset()
+
+    # Reset the upstream client only when its cookie actually changes. This
+    # preserves its in-process session/cache between warm invocations while
+    # still picking up credential updates on the next request.
+    current_cookie = credentials.get("MFP_COOKIE")
+    if current_cookie != _last_mfp_cookie:
+        mfp_client.reset()
+        _last_mfp_cookie = current_cookie
 
 
 def authorized(headers: list[tuple[bytes, bytes]], expected_token: str | None) -> bool:
