@@ -80,7 +80,7 @@ class TokenManagerTests(unittest.TestCase):
     def test_origin_check_accepts_canonical_https_origin_with_default_port(self):
         with mock.patch.object(oauth_auth, "BASE_URL", "https://runfuel.example.com"):
             self.assertTrue(token_manager._same_canonical_origin("https://runfuel.example.com"))
-            self.assertTrue(token_manager._same_canonical_origin("https://RUNFUEL-MCP.VERCEL.APP:443"))
+            self.assertTrue(token_manager._same_canonical_origin("https://runfuel.example.com:443"))
 
     def test_origin_check_rejects_other_hosts_and_unsafe_origins(self):
         with mock.patch.object(oauth_auth, "BASE_URL", "https://runfuel.example.com"):
