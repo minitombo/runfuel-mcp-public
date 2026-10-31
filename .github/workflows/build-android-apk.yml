@@ -1,0 +1,70 @@
+name: Build RunFuel Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - feat/android-app-foundation
+    paths:
+      - "mobile/**"
+      - ".github/workflows/build-android-apk.yml"
+  pull_request:
+    paths:
+      - "mobile/**"
+      - ".github/workflows/build-android-apk.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate Android platform project
+        run: |
+          flutter create \
+            --platforms=android \
+            --project-name=runfuel \
+            --org=com.runfuel \
+            --no-pub \
+            "$RUNNER_TEMP/runfuel"
+
+      - name: Copy app source into generated Flutter project
+        run: |
+          cp -R mobile/lib "$RUNNER_TEMP/runfuel/"
+          cp mobile/pubspec.yaml "$RUNNER_TEMP/runfuel/pubspec.yaml"
+          cd "$RUNNER_TEMP/runfuel"
+          sed -i 's/android:label="runfuel"/android:label="RunFuel"/' android/app/src/main/AndroidManifest.xml
+
+      - name: Resolve dependencies
+        working-directory: ${{ runner.temp }}/runfuel
+        run: flutter pub get
+
+      - name: Build ARM64 release APK
+        working-directory: ${{ runner.temp }}/runfuel
+        run: flutter build apk --release --target-platform android-arm64
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: runfuel-android-arm64-apk
+          path: ${{ runner.temp }}/runfuel/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
