@@ -33,7 +33,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from api import oauth_auth, token_manager
 from api.nutrition_metrics import fitness_get_nutrition_details
-from api.mfp_compat import mfp_get_goals, mfp_get_measurements
+from api.mfp_compat import mfp_bulk_export_bounded, mfp_get_goals, mfp_get_measurements
 from api.mfp_diagnostics import fitness_check_connection
 from api.garmin_metrics import garmin_get_running_summary
 from api.garmin_track import READ_ONLY as TRACK_READ_ONLY, garmin_get_activity_track
@@ -116,29 +116,46 @@ def _is_private_activity_metadata_key(key: object) -> bool:
     return False
 
 
-def _sanitize_activity_payload(value):
-    """Recursively remove Garmin account-owner and profile-image metadata."""
+_GPS_DETAIL_KEYS = frozenset({
+    "lat", "lon", "latitude", "longitude", "positionlat", "positionlong",
+    "startlat", "startlon", "startlatitude", "startlongitude",
+    "endlat", "endlon", "endlatitude", "endlongitude",
+    "coordinates", "coordinate", "polyline", "trackpoints", "gpspoints",
+    "routepoints", "trackcoordinates", "routecoordinates", "activitytrack",
+    "gpx", "fitfile",
+})
+
+
+def _is_gps_detail_key(key: object) -> bool:
+    """Recognize coordinate arrays and route geometry in ordinary data responses."""
+    normalized = re.sub(r"[^a-z0-9]", "", str(key).casefold())
+    return normalized in _GPS_DETAIL_KEYS
+
+
+def _sanitize_activity_payload(value, *, strip_gps: bool = False):
+    """Remove identity metadata and, unless explicitly requested, detailed GPS fields."""
     if isinstance(value, dict):
         return {
-            key: _sanitize_activity_payload(item)
+            key: _sanitize_activity_payload(item, strip_gps=strip_gps)
             for key, item in value.items()
             if not _is_private_activity_metadata_key(key)
+            and not (strip_gps and _is_gps_detail_key(key))
         }
     if isinstance(value, list):
-        return [_sanitize_activity_payload(item) for item in value]
+        return [_sanitize_activity_payload(item, strip_gps=strip_gps) for item in value]
     if isinstance(value, tuple):
-        return tuple(_sanitize_activity_payload(item) for item in value)
+        return tuple(_sanitize_activity_payload(item, strip_gps=strip_gps) for item in value)
     return value
 
 
-def _privacy_filtered_tool(fn):
-    """Wrap an upstream activity tool without changing its exposed signature."""
+def _privacy_filtered_tool(fn, *, strip_gps: bool = False):
+    """Wrap a tool without changing its signature; optionally omit GPS detail fields."""
     @functools.wraps(fn)
     async def wrapper(*args, **kwargs):
         result = fn(*args, **kwargs)
         if inspect.isawaitable(result):
             result = await result
-        return _sanitize_activity_payload(result)
+        return _sanitize_activity_payload(result, strip_gps=strip_gps)
     return wrapper
 
 # Derive the allowed host from the canonical deployment URL. This supports
@@ -161,10 +178,16 @@ def register_upstream_tools() -> None:
         fn = getattr(garmin_server, name, None)
         if fn is None:
             raise RuntimeError(f"Expected Garmin upstream tool is missing: {name}")
-        fn = _privacy_filtered_tool(fn)
+        # Ordinary Garmin reads return coaching metrics only. Detailed GPS
+        # coordinates are reserved for the separately invoked track tool.
+        fn = _privacy_filtered_tool(fn, strip_gps=True)
         mcp.add_tool(fn, name=name, annotations=READ_ONLY)
     for name in MFP_READ_TOOLS:
-        fn = getattr(mfp_server, name, None)
+        fn = (
+            mfp_bulk_export_bounded
+            if name == "fitness_bulk_export"
+            else getattr(mfp_server, name, None)
+        )
         if fn is None:
             raise RuntimeError(f"Expected MyFitnessPal upstream tool is missing: {name}")
         fn = _privacy_filtered_tool(fn)
@@ -197,7 +220,7 @@ mcp.add_tool(
 # same upstream client/session and do not add any write-capable functions.
 mcp.add_tool(_privacy_filtered_tool(mfp_server.fitness_get_day), name="mfp_get_diary", annotations=READ_ONLY)
 mcp.add_tool(_privacy_filtered_tool(mfp_server.fitness_search_food), name="mfp_search_food", annotations=READ_ONLY)
-mcp.add_tool(_privacy_filtered_tool(mfp_server.fitness_bulk_export), name="mfp_get_report", annotations=READ_ONLY)
+mcp.add_tool(_privacy_filtered_tool(mfp_bulk_export_bounded), name="mfp_get_report", annotations=READ_ONLY)
 mcp.add_tool(_privacy_filtered_tool(mfp_get_goals), name="mfp_get_goals", annotations=READ_ONLY)
 mcp.add_tool(_privacy_filtered_tool(mfp_get_measurements), name="mfp_get_measurements", annotations=READ_ONLY)
 
