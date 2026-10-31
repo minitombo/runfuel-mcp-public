@@ -4,19 +4,21 @@ RunFuel is intended to retain the information needed for useful coaching while a
 
 ## Keep for coaching and analysis
 
-- Garmin activity records and activity-detail fields returned by Garmin, including GPS coordinates when the source provides them.
+- Garmin activity records and activity-detail fields needed for coaching.
 - Distance, duration, pace, splits, elevation, heart rate, cadence, timestamps, and other training fields when available from the source.
+- Detailed GPS coordinates and route geometry only when the user explicitly requests the track for a selected activity.
 - Daily wellness, sleep, heart-rate, steps, weight, and nutrition data required for the user's coaching goals.
+- MyFitnessPal bulk exports default to a 7-day window and are capped at 31 days per request. Longer history should be retrieved as separate smaller windows; callers should avoid enabling upstream sync for broad historical ranges unless needed.
 - Activity identifiers where needed to match or compare the same activity across reads.
 
-GPS coordinates should be **preserved whenever the Garmin source provides them**; RunFuel must not remove them as part of privacy minimisation. They can support route mapping, hill and elevation analysis, turn/segment comparisons, and pace analysis. The upstream `garmin_get_activity` tool itself does not guarantee a GPS track, so RunFuel adds `garmin_get_activity_track`: it retrieves the activity archive and parses FIT records in memory, without exposing the upstream tool that writes files to disk. It returns coordinate points, timestamps, and altitude where present, evenly sampled to a configurable maximum of 2,000 points. If the activity file has no GPS records, the tool reports that instead of inventing a track. Route-level analysis still requires a successful call with actual coordinate points.
+Detailed GPS coordinates must be **on-demand, not part of routine activity reads**. Normal daily summaries, activity searches, activity details, and running summaries should return coaching metrics without coordinate arrays or route geometry. The dedicated `garmin_get_activity_track` tool is the only route-data path: call it only when the user explicitly requests route-level analysis for a selected activity. It downloads that one activity's FIT archive, parses it in memory, and returns evenly sampled points (maximum 2,000 by default and hard limit). The archive and parsed track are not persisted. If no GPS records exist, the tool reports that rather than inventing a route. This reduces unnecessary GPS downloads, response size, and processing while retaining route analysis when requested.
 
 ## Minimize identity data
 
 - The Garmin profile tool is not exposed through RunFuel's public MCP allowlist.
 - Apply recursive key-based sanitization to every exposed Garmin and MyFitnessPal response, including nested objects, lists, derived metrics, diagnostics, aliases, and GPS-track results.
 - Remove account/profile/device identifiers (including alternate names such as `userDailySummaryId`), account names, email/name fields, avatar/profile URLs, and owner metadata wherever they appear.
-- Preserve activity IDs, food/meal names, dates, nutrition values, training metrics, and GPS coordinates needed for coaching. Sanitization must never remove the `lat`/`lon` GPS points from the dedicated track tool.
+- Preserve activity IDs, food/meal names, dates, nutrition values, and training metrics in ordinary responses. Strip GPS coordinate and route-geometry fields from ordinary Garmin responses; preserve `lat`/`lon` only in the explicitly requested dedicated track-tool response.
 - Do not log credentials, session cookies, OAuth tokens, or full raw payloads containing personal data.
 - Keep MyFitnessPal exercise entries excluded because Garmin is the exercise source of truth.
 
