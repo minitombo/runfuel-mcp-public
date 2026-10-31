@@ -1,0 +1,74 @@
+name: Build RunFuel Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - feature/runfuel-android-foundation
+    paths:
+      - "app/**"
+      - ".github/workflows/android-apk.yml"
+  pull_request:
+    paths:
+      - "app/**"
+      - ".github/workflows/android-apk.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout public RunFuel source
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate Android platform scaffold
+        run: flutter create --platforms=android --org com.runfuel.app --project-name runfuel build_workspace
+
+      - name: Apply RunFuel Flutter source and tests
+        run: |
+          cp app/pubspec.yaml build_workspace/pubspec.yaml
+          rm -rf build_workspace/lib
+          cp -R app/lib build_workspace/lib
+          rm -rf build_workspace/test
+          mkdir -p build_workspace/test
+          cp -R app/test/. build_workspace/test/
+
+      - name: Resolve dependencies
+        working-directory: build_workspace
+        run: flutter pub get
+
+      - name: Run Flutter tests
+        working-directory: build_workspace
+        run: flutter test
+
+      - name: Run Flutter analysis
+        working-directory: build_workspace
+        run: flutter analyze
+
+      - name: Build ARM64 release APK
+        working-directory: build_workspace
+        run: flutter build apk --release --target-platform android-arm64
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: runfuel-android-arm64-apk
+          path: build_workspace/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
