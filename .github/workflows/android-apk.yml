@@ -9,6 +9,10 @@ on:
     paths:
       - "app/**"
       - ".github/workflows/android-apk.yml"
+  pull_request:
+    paths:
+      - "app/**"
+      - ".github/workflows/android-apk.yml"
 
 permissions:
   contents: read
