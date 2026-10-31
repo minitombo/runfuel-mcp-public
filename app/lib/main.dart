@@ -1,5 +1,6 @@
 import 'package:file_picker/file_picker.dart';
 import 'data/runfuel_database.dart';
+import 'data/backend_health_service.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -391,6 +392,8 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   final _endpoint = TextEditingController();
   bool _loaded = false;
+  bool _checking = false;
+  String? _healthStatus;
 
   @override
   void initState() {
@@ -416,6 +419,94 @@ class _SettingsPageState extends State<SettingsPage> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Backend URL saved on this device.')));
     }
+  }
+
+  Future<void> _checkBackend() async {
+    final base = _endpoint.text.trim().replaceAll(RegExp(r'/+
+    final base = _endpoint.text.trim().replaceAll(RegExp(r'/+$'), '');
+    if (base.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Save your backend URL first.')));
+      return;
+    }
+    final uri = Uri.tryParse('$base/settings');
+    if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  @override
+  void dispose() {
+    _endpoint.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => PageBody(children: [
+        const InfoPanel(icon: Icons.settings, title: 'Connection setup', body: 'RunFuel is designed to use your own public-repository deployment. No maintainer credentials or shared backend are built into this app.'),
+        const SectionTitle('Your backend'),
+        TextField(
+          controller: _endpoint,
+          keyboardType: TextInputType.url,
+          decoration: const InputDecoration(
+            labelText: 'Backend base URL',
+            hintText: 'https://your-runfuel-domain.vercel.app',
+            prefixIcon: Icon(Icons.cloud_outlined),
+          ),
+        ),
+        const SizedBox(height: 10),
+        FilledButton.icon(onPressed: _loaded ? _save : null, icon: const Icon(Icons.save_outlined), label: const Text('Save backend URL')),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(onPressed: _openSettings, icon: const Icon(Icons.open_in_new), label: const Text('Open token manager')),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: _loaded && !_checking ? _checkBackend : null,
+          icon: _checking
+              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.wifi_tethering),
+          label: Text(_checking ? 'Checking backend…' : 'Check backend health'),
+        ),
+        if (_healthStatus != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(_healthStatus!, style: const TextStyle(color: Colors.white70)),
+          ),
+        const SectionTitle('Deployment setup'),
+        OutlinedButton.icon(
+          onPressed: () => _openExternal('https://github.com/minitombo/runfuel-mcp-public'),
+          icon: const Icon(Icons.code),
+          label: const Text('Open canonical GitHub repository'),
+        ),
+        OutlinedButton.icon(
+          onPressed: () => _openExternal('https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fminitombo%2Frunfuel-mcp-public'),
+          icon: const Icon(Icons.rocket_launch),
+          label: const Text('Deploy your own RunFuel on Vercel'),
+        ),
+        const SectionTitle('Security'),
+        const InfoPanel(icon: Icons.lock_outline, title: 'Secrets are not embedded', body: 'The app does not contain Vercel, Garmin, MyFitnessPal or OpenAI secrets. The secure credential and OAuth flows still need to be connected to the backend.'),
+        const SectionTitle('Sync policy'),
+        const ConnectionTile(name: 'Manual only', detail: 'No automatic sync or background polling', icon: Icons.sync),
+        const ConnectionTile(name: 'GPS tracks', detail: 'Only retrieve when you explicitly request route analysis', icon: Icons.route),
+      ]);
+}
+), '');
+    final uri = Uri.tryParse(base);
+    if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Save a valid HTTPS backend URL first.')),
+      );
+      return;
+    }
+    setState(() => _checking = true);
+    final result = await const BackendHealthService().check(base);
+    if (mounted) {
+      setState(() {
+        _checking = false;
+        _healthStatus = result;
+      });
+    }
+  }
+
+  Future<void> _openExternal(String url) async {
+    final uri = Uri.parse(url);
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   Future<void> _openSettings() async {
