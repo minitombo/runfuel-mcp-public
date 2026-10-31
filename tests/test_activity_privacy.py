@@ -9,6 +9,7 @@ from api.index import (
     PRIVACY_FILTERED_GARMIN_TOOLS,
     _privacy_filtered_tool,
     _sanitize_activity_payload,
+    _privacy_filtered_tool,
     register_upstream_tools,
 )
 
@@ -24,7 +25,7 @@ class ActivityPrivacySanitizerTests(unittest.TestCase):
             "userId": 9876,
             "accountId": 9876,
             "username": "private-user",
-            "email": "user@example.invalid",
+            "email": "private@example.invalid",
             "firstName": "Private",
             "lastName": "Person",
             "ownerFullName": "Private Name",
@@ -69,11 +70,30 @@ class ActivityPrivacySanitizerTests(unittest.TestCase):
             "userprofileid", "userinfodto", "userprofilepk", "displayname",
             "fullname", "private full name", "userdailysummaryid", "deviceid",
             "userid", "accountid", "username", "email", "firstname", "lastname",
-            "private-device-id", "private-user", "user@example.invalid",
+            "private-device-id", "private-user", "private@example.invalid",
             "ownerprofileimageurl", "owneravatarurl", "private name",
             "private display", "private profile", "example.invalid",
         ):
             self.assertNotIn(forbidden, serialized)
+
+    def test_ordinary_garmin_responses_strip_gps_details_recursively(self):
+        payload = {
+            "activityId": 123,
+            "distance": 5000,
+            "startLatitude": -37.7,
+            "startLongitude": 175.2,
+            "splits": [{"pace": 330, "latitude": -37.7, "longitude": 175.2}],
+            "map": {"polyline": "route-data", "trackPoints": [{"lat": 1, "lon": 2}]},
+        }
+        sanitized = _sanitize_activity_payload(payload, strip_gps=True)
+        self.assertEqual(sanitized["activityId"], 123)
+        self.assertEqual(sanitized["distance"], 5000)
+        self.assertEqual(sanitized["splits"], [{"pace": 330}])
+        self.assertEqual(sanitized["map"], {})
+
+    def test_explicit_track_tool_can_preserve_gps_coordinates(self):
+        payload = {"activityId": 123, "points": [{"lat": -37.7, "lon": 175.2}]}
+        self.assertEqual(_sanitize_activity_payload(payload), payload)
 
     def test_recursively_sanitizes_lists_and_tuples(self):
         sanitized = _sanitize_activity_payload(
