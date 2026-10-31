@@ -12,7 +12,8 @@
 - Includes a mobile-friendly `/settings` page for securely storing or updating upstream credentials.
 - Keeps MyFitnessPal diary access read-only; diary write, edit, and delete tools are not exposed.
 - Uses Garmin as the source of truth for activity and step data; MyFitnessPal exercise tools are excluded.
-- Removes unnecessary identity fields from tool responses while preserving useful training metrics. GPS track data is deliberately retained for route and run analysis.
+- Bounds MyFitnessPal bulk exports to the most recent 7 days by default and a maximum of 31 days per request, preventing accidental large historical exports.
+- Removes unnecessary identity fields and detailed GPS coordinates from routine responses while preserving useful training metrics. GPS tracks are downloaded only when explicitly requested for a selected activity, sampled to at most 2,000 points, and processed in memory.
 
 ## Start here
 
