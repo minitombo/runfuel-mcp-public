@@ -422,14 +422,37 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _checkBackend() async {
-    final base = _endpoint.text.trim().replaceAll(RegExp(r'/+
     final base = _endpoint.text.trim().replaceAll(RegExp(r'/+$'), '');
-    if (base.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Save your backend URL first.')));
+    final uri = Uri.tryParse(base);
+    if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Save a valid HTTPS backend URL first.')),
+      );
       return;
     }
-    final uri = Uri.tryParse('$base/settings');
-    if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+    setState(() => _checking = true);
+    final result = await const BackendHealthService().check(base);
+    if (mounted) {
+      setState(() {
+        _checking = false;
+        _healthStatus = result;
+      });
+    }
+  }
+
+  Future<void> _openExternal(String url) async {
+    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _openSettings() async {
+    final base = _endpoint.text.trim().replaceAll(RegExp(r'/+$'), '');
+    if (base.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Save your backend URL first.')),
+      );
+      return;
+    }
+    await _openExternal('$base/settings');
   }
 
   @override
