@@ -53,3 +53,33 @@ async def mfp_get_measurements(
             "Only dates present in the local trend cache are included.",
         ],
     }
+
+
+async def mfp_bulk_export_bounded(
+    start: str | None = None,
+    end: str | None = None,
+    sync_first: bool = False,
+    ctx: Context = None,
+) -> dict:
+    """Export a bounded diary window; default to 7 days and cap at 31 days.
+
+    Large historical exports can create very large responses and trigger
+    expensive upstream synchronization. Longer histories should be requested
+    in smaller date windows. The upstream export remains read-only.
+    """
+    end_day = date.fromisoformat(end) if end else date.today()
+    start_day = date.fromisoformat(start) if start else end_day - timedelta(days=6)
+    if start_day > end_day:
+        raise ValueError("start must be on or before end")
+    span = (end_day - start_day).days + 1
+    if span > 31:
+        raise ValueError(
+            f"Date range is {span} days; maximum per export is 31 days. "
+            "Request the history in smaller date windows."
+        )
+    return await mfp_server.fitness_bulk_export(
+        start=start_day.isoformat(),
+        end=end_day.isoformat(),
+        sync_first=sync_first,
+        ctx=ctx,
+    )
