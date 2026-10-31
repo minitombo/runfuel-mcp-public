@@ -10,6 +10,8 @@ Implemented:
 - Six-tab dark dashboard shell: Home, Training, Coach, Nutrition, Health, Settings.
 - Manual-sync-first UX (sync intentionally reports that the backend adapter is not connected).
 - Backend base-URL setting saved locally.
+- On-device SQLite schema for activity summaries, nutrition-day summaries, coaching reviews and sync state.
+- Manual backend `/health` check and direct links to the canonical public GitHub repository and Vercel import flow.
 - Token-manager deep link derived from the user's own backend URL.
 - Local file/photo selection UI for health records. Files are **not uploaded** in this foundation.
 - No credentials, API keys, cookies or maintainer deployment URLs are embedded.
@@ -21,7 +23,8 @@ Not yet implemented:
 - Encrypted local health-record vault and secure upload.
 - Real token-expiry checks and notifications.
 - Vercel/GitHub provisioning wizard.
-- Production data persistence and tests.
+- Health document contents are not yet stored in an encrypted vault.
+- Garmin/MFP data is not yet synced into the SQLite cache.
 
 ## Build locally
 
@@ -34,7 +37,7 @@ flutter run
 flutter build apk --release
 ```
 
-The GitHub Actions workflow at `.github/workflows/android-apk.yml` builds an APK artifact from this source using a generated Android platform scaffold.
+The GitHub Actions workflow at `.github/workflows/android-apk.yml` runs the widget smoke test, Flutter analysis, then builds an ARM64 APK artifact from this source using a generated Android platform scaffold.
 
 ## Privacy
 
