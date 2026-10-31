@@ -9,12 +9,15 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  testWidgets('RunFuel home and primary navigation render', (tester) async {
+  testWidgets('RunFuel home and navigation render', (tester) async {
     await tester.pumpWidget(const RunFuelApp());
     await tester.pumpAndSettle();
 
     expect(find.text('Build consistency.'), findsOneWidget);
     expect(find.text('Training'), findsOneWidget);
+
+    await tester.tap(find.text('Coach'));
+    await tester.pumpAndSettle();
     expect(find.text('AI Coach'), findsOneWidget);
   });
 }
