@@ -1,4 +1,5 @@
 import 'package:file_picker/file_picker.dart';
+import 'data/runfuel_database.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,6 +11,7 @@ const _panel = Color(0xFF1A211B);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await RunFuelDatabase.instance.initialize();
   runApp(const RunFuelApp());
 }
 
