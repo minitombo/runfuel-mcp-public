@@ -1,6 +1,5 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -67,8 +66,6 @@ class RunFuelShell extends StatefulWidget {
 
 class _RunFuelShellState extends State<RunFuelShell> {
   int _index = 0;
-  String _lastSync = 'Not synced yet';
-
   final _pages = const [
     HomePage(),
     TrainingPage(),
@@ -391,7 +388,6 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   final _endpoint = TextEditingController();
-  final _secureStorage = const FlutterSecureStorage();
   bool _loaded = false;
 
   @override
@@ -417,7 +413,6 @@ class _SettingsPageState extends State<SettingsPage> {
     await prefs.setString('backend_url', value);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Backend URL saved on this device.')));
-      setState(() {});
     }
   }
 
