@@ -342,7 +342,7 @@ class _HealthPageState extends State<HealthPage> {
     if (result != null && mounted) {
       setState(() => _selectedFiles.addAll(result.files.map((f) => f.name)));
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('File selected locally. Secure upload and AI analysis will be enabled in a later integration step.')),
+        const SnackBar(content: Text('File selected. It has not been copied, uploaded or analysed.')),
       );
     }
   }
@@ -352,7 +352,7 @@ class _HealthPageState extends State<HealthPage> {
     if (image != null && mounted) {
       setState(() => _selectedFiles.add(image.name));
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Photo selected locally. It has not been uploaded or shared.')),
+        const SnackBar(content: Text('Photo selected. It has not been copied, uploaded or shared.')),
       );
     }
   }
@@ -372,7 +372,7 @@ class _HealthPageState extends State<HealthPage> {
         ]),
         const SectionTitle('Health records'),
         if (_selectedFiles.isEmpty)
-          const InfoPanel(icon: Icons.folder_open, title: 'No files selected', body: 'Supported first-stage selections: PDF, JPG, PNG and WebP. Files remain on this device in this prototype.')
+          const InfoPanel(icon: Icons.folder_open, title: 'No files selected', body: 'Supported first-stage selections: PDF, JPG, PNG and WebP. Selected files are not copied, uploaded or analysed yet.')
         else
           ..._selectedFiles.map((name) => ConnectionTile(name: name, detail: 'Selected on this device · not uploaded', icon: Icons.description_outlined)),
         const SectionTitle('Profile categories'),
